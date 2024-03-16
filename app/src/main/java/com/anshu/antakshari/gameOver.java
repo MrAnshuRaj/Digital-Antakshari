@@ -172,8 +172,7 @@ public class gameOver extends AppCompatActivity {
                 editor.apply();
             }
         }
-
-
+    //version 3.0
     }
 
     public void playAgain(View v) {
