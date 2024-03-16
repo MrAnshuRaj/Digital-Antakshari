@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "22562251146",
+    "project_id": "antakshari-75fe9",
+    "storage_bucket": "antakshari-75fe9.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:22562251146:android:4c3bb40c35e8840d1d6873",
+        "android_client_info": {
+          "package_name": "com.anshu.antakshari"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "22562251146-71ojubggj5sbf7ps5k199p4llvl04fst.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDYfGjH5LKlm5hK6iiHPqXxZ-srN_patvI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "22562251146-71ojubggj5sbf7ps5k199p4llvl04fst.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:22562251146:android:7f36983e9208142e1d6873",
+        "android_client_info": {
+          "package_name": "com.anshu.myapplication"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "22562251146-71ojubggj5sbf7ps5k199p4llvl04fst.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDYfGjH5LKlm5hK6iiHPqXxZ-srN_patvI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "22562251146-71ojubggj5sbf7ps5k199p4llvl04fst.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
