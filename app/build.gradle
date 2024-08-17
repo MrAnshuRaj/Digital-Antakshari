@@ -6,8 +6,6 @@ plugins {
 android {
     namespace 'com.anshu.antakshari'
     compileSdk 34
-    aaptOptions.cruncherEnabled = false
-    aaptOptions.useNewCruncher = false
 
     defaultConfig {
         applicationId "com.anshu.antakshari"
@@ -45,6 +43,7 @@ dependencies {
     implementation libs.volley
     implementation libs.firebase.storage
     implementation libs.firebase.auth
+    implementation libs.androidx.activity
     testImplementation libs.junit
     androidTestImplementation libs.androidx.test.ext.junit
     androidTestImplementation libs.espresso.core

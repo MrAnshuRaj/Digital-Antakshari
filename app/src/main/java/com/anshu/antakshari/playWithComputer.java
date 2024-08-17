@@ -25,6 +25,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -35,7 +36,12 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.GetTokenResult;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -53,25 +59,27 @@ import java.util.Map;
 import java.util.Objects;
 
 public class playWithComputer extends AppCompatActivity {
-ImageView userPic, done;
-String previousWord;
-char lastLetterOfPreviousWord;
-boolean firstTurn=true,wrongWord=false, vocabExhaust=false;
-int points=0,computerPoints=0,wordCounter=0,REQ_CODE=100;
-SharedPreferences getShared;
-SharedPreferences.Editor editor;
-FirebaseFirestore leaderBoard = FirebaseFirestore.getInstance();
-DocumentReference index=leaderBoard.document("Leaderboard/Index");
-TextView computer,nextLetter,computerPts,userPoints,thinking;
-EditText userInput;
-TextToSpeech tts;
-String[] words = new String[1000];
-String nameOfPlayer;
-TextView computerModeTimer;
-Button endButton,nextBtn;
-CountDownTimer timer;
-ProgressBar submitProgressBar;
-String[] a;
+    ImageView userPic, done;
+    String previousWord;
+    char lastLetterOfPreviousWord;
+    boolean firstTurn=true,wrongWord=false, vocabExhaust=false;
+    int points=0,computerPoints=0,wordCounter=0,REQ_CODE=100;
+    SharedPreferences getShared;
+    SharedPreferences.Editor editor;
+    FirebaseFirestore leaderBoard = FirebaseFirestore.getInstance();
+    DocumentReference index=leaderBoard.document("Leaderboard/Index");
+    TextView computer,nextLetter,computerPts,userPoints,thinking;
+    EditText userInput;
+    TextToSpeech tts;
+    String[] words = new String[1000];
+    String nameOfPlayer;
+    TextView computerModeTimer;
+    Button endButton,nextBtn;
+    CountDownTimer timer;
+        FirebaseUser currentUser;
+    ProgressBar submitProgressBar;
+    String[] a;
+    private String emailId;
 
     {
         a = new String[]{"apple", "addition", "answer", "allotrope", "ample", "addition", "bet", "busy", "bamboo", "bend", "blend", "beast"
@@ -102,6 +110,7 @@ String[] a;
         userPic=findViewById(R.id.userImage);
         done=findViewById(R.id.doneImageVIew);
         submitProgressBar=findViewById(R.id.submitProgressBar);
+        currentUser =   FirebaseAuth.getInstance().getCurrentUser();
         endButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -137,7 +146,7 @@ String[] a;
 
         getShared=getSharedPreferences("digANT",MODE_PRIVATE);
         editor=getShared.edit();
-
+        emailId = getShared.getString("email","default");
         nameOfPlayer = getShared.getString("Name", "Null");
         String profilePicPath =getShared.getString("ProfilePath","");
         loadImageFromStorage(profilePicPath);
@@ -384,40 +393,32 @@ String[] a;
                     Toast.LENGTH_SHORT).show();
         }
     }
-    public void endGame()
-    {
+    public void endGame() {
         //updating total points on device
-        int totalPoints=getShared.getInt("totalPoints",0)+points;
-        editor.putInt("totalPoints",totalPoints);
+        emailId = currentUser.getEmail();
+        int totalPoints = getShared.getInt("totalPoints", 0) + points;
+        editor.putInt("totalPoints", totalPoints);
         editor.apply();
         timer.cancel();
-        if(getShared.getBoolean("firstPlay",true)) { //if first time set data on an index
-            index.get().addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
-                @Override
-                public void onSuccess(DocumentSnapshot documentSnapshot) {
-                    Long ind = documentSnapshot.getLong("index");
 
-                    editor.putLong("IndexLBD", ind);
-                    editor.putBoolean("firstPlay", false);
-                    editor.apply(); //setting index of player from database to device
+        if (getShared.getBoolean("firstPlay", true) ) { //if first time set data on an index
+            final int[] pts = {0};
+            rankListDataFirestore data = new rankListDataFirestore(nameOfPlayer, pts[0]); //index set to zero for all
+            leaderBoard.collection("Leaderboard").document("User: "+emailId).set(data)
+                    .addOnCompleteListener(new OnCompleteListener<Void>() {
+                        @Override
+                        public void onComplete(@NonNull Task<Void> task) {
+                            editor.putBoolean("firstPlay", false);
+                            editor.putInt("totalPoints",totalPoints);
+                            editor.apply();
+                        }
+                    });
 
-                    rankListDataFirestore data = new rankListDataFirestore(nameOfPlayer, Integer.parseInt(String.valueOf(ind)), totalPoints);
-                    leaderBoard.collection("Leaderboard").document("Index" + Objects.requireNonNull(ind)).set(data);
-
-
-                    HashMap<String, Integer> indexUpdate = new HashMap<>();
-                    indexUpdate.put("index", (int) (ind + 1));
-                    index.set(indexUpdate);//index++ on database
-
-                }
-            });
-        }
-        else //if 2nd or further time then set data on the index for the play from shared pref
+        } else //if 2nd or further time then set data on the index for the play from shared pref
         {
-            rankListDataFirestore dataUpdate=new rankListDataFirestore(nameOfPlayer, Math.toIntExact(getShared.getLong("IndexLBD", -1L)),totalPoints);
-            leaderBoard.collection("Leaderboard").document("Index" + getShared.getLong("IndexLBD",-1L)).set(dataUpdate);
+            rankListDataFirestore dataUpdate = new rankListDataFirestore(nameOfPlayer, totalPoints);
+            leaderBoard.collection("Leaderboard").document("User: "+emailId).set(dataUpdate);
         }
-
         //alertDialog code
         String title,message;
         if(vocabExhaust)

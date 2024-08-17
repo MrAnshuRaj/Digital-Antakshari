@@ -51,7 +51,7 @@
         android:layout_marginTop="24dp"
         android:layout_marginEnd="16dp"
         app:cardCornerRadius="20dp"
-        app:cardElevation="20dp"
+        app:cardElevation="15dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/level">
@@ -87,7 +87,6 @@
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
         android:fontFamily="@font/alata"
-        android:onClick="testLogin"
         android:text="Play Now, Anshu!"
         android:textColor="#000000"
         android:textSize="30sp"
@@ -153,7 +152,7 @@
                 android:layout_marginTop="12dp"
                 android:layout_marginBottom="12dp"
                 app:cardCornerRadius="20dp"
-                app:cardElevation="20dp">
+                app:cardElevation="15dp">
 
                 <androidx.constraintlayout.widget.ConstraintLayout
                     android:layout_width="match_parent"
@@ -172,7 +171,7 @@
                 android:layout_marginTop="12dp"
                 android:layout_marginBottom="12dp"
                 app:cardCornerRadius="20dp"
-                app:cardElevation="20dp">
+                app:cardElevation="15dp">
 
                 <androidx.constraintlayout.widget.ConstraintLayout
                     android:layout_width="match_parent"
@@ -192,7 +191,7 @@
                 android:layout_marginEnd="12dp"
                 android:layout_marginBottom="12dp"
                 app:cardCornerRadius="20dp"
-                app:cardElevation="20dp">
+                app:cardElevation="15dp">
 
                 <androidx.constraintlayout.widget.ConstraintLayout
                     android:layout_width="match_parent"

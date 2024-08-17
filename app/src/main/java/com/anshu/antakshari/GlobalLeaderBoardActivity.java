@@ -73,11 +73,5 @@ public class GlobalLeaderBoardActivity extends AppCompatActivity {
 
     }
 
-//    @Override
-//    public void onBackPressed() {
-//        super.onBackPressed();
-//        startActivity(new Intent(GlobalLeaderBoardActivity.this, GameMode.class));
-//        finish();
-//    }
 
 }

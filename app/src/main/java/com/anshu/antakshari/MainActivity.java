@@ -1,5 +1,6 @@
 package com.anshu.antakshari;
 
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.media.MediaPlayer;
 import android.os.Bundle;
@@ -14,6 +15,9 @@ import android.widget.Spinner;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -25,12 +29,16 @@ public class MainActivity extends AppCompatActivity {
     EditText names;
     TextToSpeech t1;
     Spinner toughness, mainTime;
-
+    FirebaseUser currentUser;
+    @SuppressLint("SetTextI18n")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         names = findViewById(R.id.namesin);
+        currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        String name = Objects.requireNonNull(currentUser).getDisplayName().split(" ")[0];
+        if (name != null) names.setText(name + ",");
         toughness = findViewById(R.id.spinner);
         mainTime = findViewById(R.id.spinner2);
         Objects.requireNonNull(getSupportActionBar()).hide();
@@ -143,11 +151,4 @@ public class MainActivity extends AppCompatActivity {
                     .setPositiveButton("OK", (dialogInterface, i) -> dialogInterface.cancel()).create().show();
         }
     }
-//    @Override
-//    public void onBackPressed() {
-//        super.onBackPressed();
-//        startActivity(new Intent(MainActivity.this, GameMode.class));
-//        finish();
-//    }
-
 }

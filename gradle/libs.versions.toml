@@ -1,5 +1,5 @@
 [versions]
-agp = "8.3.0-alpha09"
+agp = "8.5.2"
 junit = "4.13.2"
 androidx-test-ext-junit = "1.1.5"
 espresso-core = "3.5.1"
@@ -11,6 +11,8 @@ volley = "1.2.1"
 google-services = "4.4.0"
 firebase-storage = "20.3.0"
 firebase-auth = "22.3.0"
+google-gms-google-services = "4.4.2"
+activity = "1.9.0"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -24,7 +26,9 @@ volley = { group = "com.android.volley", name = "volley", version.ref = "volley"
 google-services = { group = "com.google.gms", name = "google-services", version.ref = "google-services" }
 firebase-storage = { group = "com.google.firebase", name = "firebase-storage", version.ref = "firebase-storage" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth", version.ref = "firebase-auth" }
+androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
+googleGmsGoogleServices = { id = "com.google.gms.google-services", version.ref = "google-gms-google-services" }
 

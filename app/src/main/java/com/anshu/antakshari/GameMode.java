@@ -18,6 +18,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.android.volley.AuthFailureError;
@@ -27,8 +28,13 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
 import com.squareup.picasso.Picasso;
 
 import org.json.JSONException;
@@ -51,21 +57,24 @@ public class GameMode extends AppCompatActivity {
     CircleImageView profilePic;
     TextView playerName, greeting, level;
     EditText searchBox;
-    boolean isGoogleSignIn, dpUpdated;
-
+    boolean isGoogleSignIn;
+    private DocumentReference userRef;
+    private FirebaseFirestore db;
+    FirebaseAuth auth;
 
     @SuppressLint("SetTextI18n")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        //overridePendingTransition(R.anim.slide_from_left,R.anim.slide_from_right);
         setContentView(R.layout.dashboard);
         profilePic = findViewById(R.id.dpDB);
         playerName = findViewById(R.id.playerNameDB);
         searchBox = findViewById(R.id.searchWord);
         greeting = findViewById(R.id.greeting);
         level = findViewById(R.id.level);
-
+        auth = FirebaseAuth.getInstance();
+        db = FirebaseFirestore.getInstance();
+        userRef = db.collection("users").document(auth.getCurrentUser().getUid());
         Objects.requireNonNull(getSupportActionBar()).hide();
 
         getSharedPref = getSharedPreferences("digANT", MODE_PRIVATE);
@@ -79,9 +88,19 @@ public class GameMode extends AppCompatActivity {
     public void loadData() {
         nameFull = getSharedPref.getString("FullName", "DigAnt User");
         playerName.setText(nameFull);
-
+        db.collection("Leaderboard").document("User: "+auth.getCurrentUser().getEmail()).
+                get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+                    @Override
+                    public void onComplete(@NonNull Task<DocumentSnapshot> task) {
+                        if(task.isSuccessful() && task.getResult().exists())
+                        {
+                            int totalPointsDB = Objects.requireNonNull(task.getResult().getLong("points")).intValue();
+                            editor.putInt("totalPoints",totalPointsDB);
+                            editor.apply();
+                        }
+                    }
+                });
         isGoogleSignIn = getSharedPref.getBoolean("GoogleSignIn", false);
-        dpUpdated = getSharedPref.getBoolean("dpUpdated", false);
 
         firstName = getSharedPref.getString("Name", "player123");
         greeting.setText("Play Now, " + firstName + "!");
@@ -91,32 +110,24 @@ public class GameMode extends AppCompatActivity {
 
         profilePicPath = getSharedPref.getString("ProfilePath", "");
         //
-        if (isGoogleSignIn && !dpUpdated) {
+        if (isGoogleSignIn) {
             FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
             Picasso
                     .get()
                     .load(Objects.requireNonNull(user).getPhotoUrl())
                     .into(profilePic);
         } else {
-            if (profilePicPath.isEmpty()) {
-                Drawable res = getResources().getDrawable(R.drawable.displaypicmenu);
-                profilePic.setImageDrawable(res);
-            } else
-                loadImageFromStorage(profilePicPath); //is not google sign
+            userRef.get().addOnCompleteListener(task -> {
+                if (task.isSuccessful()) {
+                    DocumentSnapshot document = task.getResult();
+                    if (document.exists() && document.getString("ownerImage")!=null) {
+                        Picasso.get().load(document.getString("ownerImage")).into(profilePic);
+                    }
+                }
+            }); //is not google sign
         }
     }
 
-    private void loadImageFromStorage(String path) {
-        try {
-            File f = new File(path, "profile.jpg");
-            Bitmap b = BitmapFactory.decodeStream(new FileInputStream(f));
-
-            profilePic.setImageBitmap(b);
-        } catch (FileNotFoundException e) {
-            e.printStackTrace(System.out);
-        }
-
-    }
 
     //various modes onClick methods
     public void PlayWithComputer(View v) {
@@ -165,7 +176,6 @@ public class GameMode extends AppCompatActivity {
     }
 
     public void timeAttackMode(View v) {
-        if (!getSharedPref.getBoolean("firstPlay", true)) {
             //customised dialog for time Attack mode
             String[] itemsTimeAttack = {"30s", "60s", "120s", "180s", "300s"};
             Intent intent = new Intent(GameMode.this, timeAttackMode.class);
@@ -182,8 +192,6 @@ public class GameMode extends AppCompatActivity {
                     startActivity(intent);
                 }
             }).create().show();
-        } else
-            Toast.makeText(GameMode.this, "This mode unlocks after playing the primary modes of the game", Toast.LENGTH_LONG).show();
     }
 
     //to check internet connectivity status
@@ -250,7 +258,10 @@ public class GameMode extends AppCompatActivity {
 
     public int level(int points) {
         int lev = 1;
-        if (points <= 2000) {
+        if(points<200){
+            return  1;
+        }
+        else if (points <= 2000) {
             lev = points / 200;
         } else if (points <= 12000) {
             lev = 10 + (points - 2000) / 500;

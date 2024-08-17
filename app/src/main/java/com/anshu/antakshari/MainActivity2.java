@@ -11,11 +11,15 @@ import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.text.TextUtils;
+import android.text.method.HideReturnsTransformationMethod;
+import android.text.method.PasswordTransformationMethod;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResult;
@@ -41,6 +45,8 @@ import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -56,16 +62,55 @@ public class MainActivity2 extends AppCompatActivity {
     private FirebaseAuth mAuth;
     SharedPreferences sh;
     SharedPreferences.Editor editor;
+    private EditText etEmail, etPassword;
+    private Button btnSignIn;
+    private FirebaseFirestore db;
+    private TextView tvForgotPassword,btnSignUp;
+    ImageView ivShowHidePassword;
 
     ActivityResultLauncher<Intent> activityResultLauncherImage;
-
+    FirebaseUser currentUser;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.login_screen);
-        nameInput = findViewById(R.id.EntryName);
-        //profilePic = findViewById(R.id.ProfilePicImageView);
 
+        etEmail = findViewById(R.id.etEmail);
+        etPassword = findViewById(R.id.etPassword);
+        btnSignIn = findViewById(R.id.btnSignIn);
+        btnSignUp = findViewById(R.id.tvSignUp);
+        tvForgotPassword = findViewById(R.id.tvForgotPassword);
+        db = FirebaseFirestore.getInstance();
+        ivShowHidePassword = findViewById(R.id.ivShowHidePassword);
+        ivShowHidePassword.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                togglePasswordVisibility(etPassword, ivShowHidePassword);
+            }
+        });
+        btnSignIn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                signInUser();
+            }
+        });
+        btnSignUp.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Redirect to SignUpActivity
+                Intent intent = new Intent(MainActivity2.this, SignUpActivity.class);
+                startActivity(intent);
+                finish();
+            }
+        });
+
+        tvForgotPassword.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                resetPassword();
+            }
+        });
+        mAuth = FirebaseAuth.getInstance();
         sh= getSharedPreferences("digANT", MODE_PRIVATE);
         editor= sh.edit();
 
@@ -85,50 +130,62 @@ public class MainActivity2 extends AppCompatActivity {
         registerForActivityResult(new ActivityResultContracts.StartIntentSenderForResult(), new ActivityResultCallback<ActivityResult>() {
             @Override
             public void onActivityResult(ActivityResult o) {
-                if (o.getResultCode() == Activity.RESULT_OK) {
-                    try {
-                        SignInCredential credential = oneTapClient.getSignInCredentialFromIntent(o.getData());
-                        String idToken = credential.getGoogleIdToken();
-                        if (idToken != null) {
-                            String emailId = credential.getId(); //getting email id
-                            Toast.makeText(MainActivity2.this,"Signed in with "+emailId, Toast.LENGTH_LONG).show(); //displaying the email id
+        if (o.getResultCode() == Activity.RESULT_OK) {
+            try {
+                SignInCredential credential = oneTapClient.getSignInCredentialFromIntent(o.getData());
+                String idToken = credential.getGoogleIdToken();
+                if (idToken != null) {
+                    String emailId = credential.getId(); //getting email id
+                    Toast.makeText(MainActivity2.this,"Signed in with "+emailId, Toast.LENGTH_LONG).show(); //displaying the email id
+                    editor.putString("email",emailId);
+                    editor.apply();
+                    AuthCredential firebaseCredential = GoogleAuthProvider.getCredential(idToken, null);
+                    mAuth.signInWithCredential(firebaseCredential)
+                            .addOnCompleteListener(MainActivity2.this, new OnCompleteListener<AuthResult>() {
+                                @Override
+                                public void onComplete(@NonNull Task<AuthResult> task) {
+                                    if (task.isSuccessful()) {
+                                        Log.d(TAG, "signInWithCredential:success");
+                                        FirebaseUser user = mAuth.getCurrentUser();
+                                        assert user != null;
 
-                            AuthCredential firebaseCredential = GoogleAuthProvider.getCredential(idToken, null);
-                            mAuth.signInWithCredential(firebaseCredential)
-                                    .addOnCompleteListener(MainActivity2.this, new OnCompleteListener<AuthResult>() {
-                                        @Override
-                                        public void onComplete(@NonNull Task<AuthResult> task) {
-                                            if (task.isSuccessful()) {
-                                                Log.d(TAG, "signInWithCredential:success");
-                                                FirebaseUser user = mAuth.getCurrentUser();
-                                                assert user != null;
+                                        String[] msg1 = Objects.requireNonNull(user.getDisplayName()).split(" ");
+                                        //Toast.makeText(MainActivity2.this,"Full Name : "+user.getDisplayName()+" First:"+msg1[0],Toast.LENGTH_LONG).show();
+                                        String msg = Character.toUpperCase(msg1[0].charAt(0)) + msg1[0].substring(1);
+                                        //writing data to shared preferences
+                                        SharedPreferences sh = getSharedPreferences("digANT", MODE_PRIVATE);
+                                        SharedPreferences.Editor editor = sh.edit();
+                                        editor.putString("Name", msg); //storing first name in shared prefs
+                                        editor.putBoolean("Logged", true);
+                                        editor.putBoolean("GoogleSignIn",true);// logged status set to true in shared prefs
+                                        editor.putString("FullName", user.getDisplayName()); //storing full name in shared prefs
+                                        editor.putInt("totalGamesPlayed", 1);
+                                        editor.putInt("totalWins", 0);
+                                        // editor.putInt("winPercentage",0);
 
-                                                String[] msg1 = Objects.requireNonNull(user.getDisplayName()).split(" ");
-                                                //Toast.makeText(MainActivity2.this,"Full Name : "+user.getDisplayName()+" First:"+msg1[0],Toast.LENGTH_LONG).show();
-                                                String msg = Character.toUpperCase(msg1[0].charAt(0)) + msg1[0].substring(1);
-                                                //writing data to shared preferences
-                                                SharedPreferences sh = getSharedPreferences("digANT", MODE_PRIVATE);
-                                                SharedPreferences.Editor editor = sh.edit();
-                                                editor.putString("Name", msg); //storing first name in shared prefs
-                                                editor.putBoolean("Logged", true);
-                                                editor.putBoolean("GoogleSignIn",true);// logged status set to true in shared prefs
-                                                editor.putString("FullName", user.getDisplayName()); //storing full name in shared prefs
-                                                editor.apply();
-                                                //profilePic.setImageURI(user.getPhotoUrl());
+                                        editor.putInt("highestScore", 0);
+                                        //editor.putInt("avgScore",0);
+                                        editor.putInt("totalWordsPlayed", 1);
+                                        //editor.putInt("avgWordLength",0);
+                                        editor.putInt("fastestResponseTime", 30);
+                                        editor.putInt("timeSpentPlaying", 0);
+                                        editor.putBoolean("firstPlay", true);
+                                        editor.apply();
+                                        //profilePic.setImageURI(user.getPhotoUrl());
 
-                                                startActivity(new Intent(MainActivity2.this,GameMode.class));
-                                            } else {
-                                                Log.w(TAG, "signInWithCredential:failure", task.getException());
+                                        startActivity(new Intent(MainActivity2.this,GameMode.class));
+                                    } else {
+                                        Log.w(TAG, "signInWithCredential:failure", task.getException());
 
-                                            }
-                                        }
-                                    });
-                        }
-                    } catch (ApiException e) {
-                        Toast.makeText(MainActivity2.this,"Sign in not possible", Toast.LENGTH_LONG).show();
-                    }
-
+                                    }
+                                }
+                            });
                 }
+            } catch (ApiException e) {
+                Toast.makeText(MainActivity2.this,"Sign in not possible", Toast.LENGTH_LONG).show();
+            }
+
+        }
                     }
 
                 });
@@ -156,39 +213,6 @@ public class MainActivity2 extends AppCompatActivity {
             }
         });
 
-        /* code to take image input from gallery
-        activityResultLauncherImage =
-                registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), new ActivityResultCallback<ActivityResult>() {
-                    @Override
-                    public void onActivityResult(ActivityResult o) {
-                        if (o.getResultCode() == Activity.RESULT_OK && o.getData() != null) {
-                            Bundle data = o.getData().getExtras();
-                            assert data != null;
-                            Uri selectedImageUri = (Uri) data.get("data");
-
-                            if (null != selectedImageUri) {
-                                // update the preview image in the layout
-                                profilePic.setImageURI(selectedImageUri);
-                                try {
-                                    //storing image in bitmap and saving its path to shared preferences
-                                    Bitmap selectedImageBitmap = MediaStore.Images.Media.getBitmap(
-                                            MainActivity2.this.getContentResolver(),
-                                            selectedImageUri);
-                                    String path = saveToInternalStorage(selectedImageBitmap); //local method
-
-                                    //saving path in shared preferences
-                                    SharedPreferences sh = getSharedPreferences("digANT", MODE_PRIVATE);
-                                    SharedPreferences.Editor editor = sh.edit();
-                                    editor.putString("ProfilePath", path);
-                                    editor.apply();
-
-                                } catch (IOException e) {
-                                    e.printStackTrace(System.out);
-                                }
-                            }
-                        }
-                    }
-                });*/
 
     }
 
@@ -198,25 +222,6 @@ public class MainActivity2 extends AppCompatActivity {
             String msg = Character.toUpperCase(msg1[0].charAt(0)) + msg1[0].substring(1);
 
 
-
-            editor.putString("Name", msg);
-            editor.putBoolean("Logged", true);
-            editor.putString("FullName", nameInput.getText().toString());
-            //totalWins,winPercentage,totalPoints,highestScore,avgScore,totalWordsPlayed,avgWordLength,fastestResponseTime,timeSpentPlaying;
-
-            editor.putInt("totalGamesPlayed", 0);
-            editor.putInt("totalWins", 0);
-            // editor.putInt("winPercentage",0);
-            editor.putInt("totalPoints", 0);
-            editor.putInt("highestScore", 0);
-            //editor.putInt("avgScore",0);
-            editor.putInt("totalWordsPlayed", 0);
-            //editor.putInt("avgWordLength",0);
-            editor.putInt("fastestResponseTime", 30);
-            editor.putInt("timeSpentPlaying", 0);
-            editor.putBoolean("firstPlay", true);
-            editor.apply();
-
             Intent i = new Intent(MainActivity2.this, GameMode.class);
             startActivity(i);
             finish();
@@ -224,6 +229,16 @@ public class MainActivity2 extends AppCompatActivity {
             Toast.makeText(getApplicationContext(), "Please enter your name!", Toast.LENGTH_SHORT).show();
         }
 
+    }
+    private void togglePasswordVisibility(EditText editText, ImageView imageView) {
+        if (editText.getTransformationMethod().equals(PasswordTransformationMethod.getInstance())) {
+            editText.setTransformationMethod(HideReturnsTransformationMethod.getInstance());
+            imageView.setImageResource(R.drawable.ic_eye_off);
+        } else {
+            editText.setTransformationMethod(PasswordTransformationMethod.getInstance());
+            imageView.setImageResource(R.drawable.ic_eye);
+        }
+        editText.setSelection(editText.getText().length());
     }
 
    @SuppressLint("IntentReset")
@@ -233,30 +248,6 @@ public class MainActivity2 extends AppCompatActivity {
         imagePickerIntent.setType("image/*");
         //activityResultLauncherImage.launch(imagePickerIntent);
     }
-
-        private String saveToInternalStorage(Bitmap bitmapImage) {
-            ContextWrapper cw = new ContextWrapper(getApplicationContext());
-            // path to /data/data/yourApp/app_data/imageDir
-            File directory = cw.getDir("imageDir", Context.MODE_PRIVATE);
-            // Create imageDir
-            File myPath = new File(directory, "profile.jpg");
-
-            FileOutputStream fos = null;
-            try {
-                fos = new FileOutputStream(myPath);
-                // Use the compress method on the BitMap object to write image to the OutputStream
-                bitmapImage.compress(Bitmap.CompressFormat.PNG, 100, fos);
-            } catch (Exception e) {
-                e.printStackTrace(System.out);
-            } finally {
-                try {
-                    Objects.requireNonNull(fos).close();
-                } catch (IOException e) {
-                    e.printStackTrace(System.out);
-                }
-            }
-            return directory.getAbsolutePath();
-        }
 
     @Override
     public void onStart() {
@@ -272,6 +263,76 @@ public class MainActivity2 extends AppCompatActivity {
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP|Intent.FLAG_ACTIVITY_CLEAR_TOP);
             startActivity(intent);
         }
+    }
+    private void signInUser() {
+        String email = etEmail.getText().toString();
+        String password = etPassword.getText().toString();
+
+        if (TextUtils.isEmpty(email) || TextUtils.isEmpty(password)) {
+            Toast.makeText(MainActivity2.this, "All fields are required", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        mAuth.signInWithEmailAndPassword(email, password)
+                .addOnCompleteListener(this,  task -> {
+                    if (task.isSuccessful()) {
+                        Toast.makeText(MainActivity2.this, "Sign in successful", Toast.LENGTH_SHORT).show();
+                        // Redirect to main activity or dashboard
+                        SharedPreferences sharedPreferences = getSharedPreferences("digANT",MODE_PRIVATE);
+                        SharedPreferences.Editor editor = sharedPreferences.edit();
+                        db.collection("users").document(Objects.requireNonNull(mAuth.getUid())).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+                            @Override
+                            public void onComplete(@NonNull Task<DocumentSnapshot> task) {
+                                if(task.isSuccessful())
+                                {
+                                    String name = task.getResult().getString("name");
+
+                                    editor.putString("FullName", name);
+                                    String firstName = name.split(" ")[0];
+                                    editor.putString("Name",firstName);
+                                }
+                            }
+                        });
+                        editor.putBoolean("Logged", true);
+
+                        //totalWins,winPercentage,totalPoints,highestScore,avgScore,totalWordsPlayed,avgWordLength,fastestResponseTime,timeSpentPlaying;
+
+                        editor.putInt("totalGamesPlayed", 1);
+                        editor.putInt("totalWins", 1);
+                        editor.putInt("highestScore", 0);
+                        editor.putInt("totalWordsPlayed", 1);
+                        editor.putInt("fastestResponseTime", 30);
+                        editor.putInt("timeSpentPlaying", 0);
+                        editor.putBoolean("firstPlay", true);
+                        editor.apply();
+
+                        startActivity(new Intent(this, GameMode.class));
+                        finish();
+                    } else {
+                        Toast.makeText(MainActivity2.this, "Sign in failed: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+    private void resetPassword() {
+        String email = etEmail.getText().toString();
+
+        if (TextUtils.isEmpty(email)) {
+            Toast.makeText(MainActivity2.this, "Please enter your email", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        mAuth.sendPasswordResetEmail(email)
+                .addOnCompleteListener(new OnCompleteListener<Void>() {
+                    @Override
+                    public void onComplete(@NonNull Task<Void> task) {
+                        if (task.isSuccessful()) {
+                            Toast.makeText(MainActivity2.this, "Password reset email sent", Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(MainActivity2.this, "Failed to send reset email: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
     }
 
 }

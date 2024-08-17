@@ -11,12 +11,15 @@ import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GetTokenResult;
@@ -35,6 +38,8 @@ public class gameOver extends AppCompatActivity {
     String[] name;
     int[] score;
     int rounds;
+    FirebaseAuth user;
+    FirebaseUser currentUser;
     FirebaseFirestore leaderBoard = FirebaseFirestore.getInstance();
     DocumentReference index = leaderBoard.document("Leaderboard/Index");
     StringBuilder list;
@@ -43,6 +48,7 @@ public class gameOver extends AppCompatActivity {
     SharedPreferences.Editor editor;
     RecyclerView recyclerView;
     ArrayList<LeaderBoardModel> arrayList = new ArrayList<>();
+    private String emailId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -75,8 +81,57 @@ public class gameOver extends AppCompatActivity {
         p.start();
         Animation a1 = AnimationUtils.loadAnimation(this, R.anim.anim2);
         cong.startAnimation(a1);
+        currentUser=FirebaseAuth.getInstance().getCurrentUser();
+        emailId=currentUser.getEmail();
         sort();
+        storeData();
+    }
 
+    private void storeData() {
+        for (int i = 0; i < score.length; i++) {
+            arrayList.add(new LeaderBoardModel((i + 1), name[i], score[i]));
+        }
+        RecyclerLeaderBdAdapter adapter = new RecyclerLeaderBdAdapter(this, arrayList);
+        recyclerView.setAdapter(adapter);
+
+        //for player profile
+        if (nameOfPlayer.equals(name[0])) {
+            editor.putInt("totalWins", getShared.getInt("totalWins", 0) + 1);
+            editor.apply();
+        }
+        for (int i = 0; i < score.length; i++) {
+            if (nameOfPlayer.equals(name[i])) {
+                //totalPoints
+                int totalPoints = getShared.getInt("totalPoints", 0) + score[i];
+                editor.putInt("totalPoints", totalPoints);
+                editor.apply();
+                if (getShared.getBoolean("firstPlay", true) ) { //if first time set data on an index
+                    final int[] pts = {0};
+                    rankListDataFirestore data = new rankListDataFirestore(nameOfPlayer, pts[0]); //index set to zero for all
+                    leaderBoard.collection("Leaderboard").document("User: "+emailId).set(data)
+                        .addOnCompleteListener(new OnCompleteListener<Void>() {
+                            @Override
+                            public void onComplete(@NonNull Task<Void> task) {
+                                editor.putBoolean("firstPlay", false);
+                                editor.putInt("totalPoints",totalPoints);
+                                editor.apply();
+                            }
+                        });
+
+                } else //if 2nd or further time then set data on the index for the play from shared pref
+                {
+                    rankListDataFirestore dataUpdate = new rankListDataFirestore(nameOfPlayer, totalPoints);
+                    leaderBoard.collection("Leaderboard").document("User: "+emailId).set(dataUpdate);
+                }
+                //highestScore //inside name equality if block
+                if (score[i] > getShared.getInt("highestScore", 0))
+                    editor.putInt("highestScore", score[i]);
+                //wordsPlayed
+                int wordsPlayed = rounds / name.length;
+                editor.putInt("totalWordsPlayed", (getShared.getInt("totalWordsPlayed", 0) + wordsPlayed));
+                editor.apply();
+            }
+        }
     }
 
     @SuppressLint("SetTextI18n")
@@ -98,81 +153,6 @@ public class gameOver extends AppCompatActivity {
 
             }
         }
-        for (int i = 0; i < score.length; i++) {
-            arrayList.add(new LeaderBoardModel((i + 1), name[i], score[i]));
-        }
-        RecyclerLeaderBdAdapter adapter = new RecyclerLeaderBdAdapter(this, arrayList);
-        recyclerView.setAdapter(adapter);
-
-        //for player profile
-        if (nameOfPlayer.equals(name[0])) {
-            editor.putInt("totalWins", getShared.getInt("totalWins", 0) + 1);
-            editor.apply();
-        }
-        for (int i = 0; i < n; i++) {
-            if (nameOfPlayer.equals(name[i])) {
-                //totalPoints
-                int totalPoints = getShared.getInt("totalPoints", 0) + score[i];
-                editor.putInt("totalPoints", totalPoints);
-                boolean googleSignIn = getShared.getBoolean("GoogleSignIn", false);
-                if (getShared.getBoolean("firstPlay", true) && !googleSignIn) { //if first time set data on an index
-                    index.get().addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
-                        @Override
-                        public void onSuccess(DocumentSnapshot documentSnapshot) {
-                            Long ind = documentSnapshot.getLong("index");
-
-                            editor.putLong("IndexLBD", ind);
-                            editor.putBoolean("firstPlay", false);
-                            editor.apply(); //setting index of player from database to device
-
-                            rankListDataFirestore data = new rankListDataFirestore(nameOfPlayer, Integer.parseInt(String.valueOf(ind)), totalPoints);
-                            leaderBoard.collection("Leaderboard").document("Index" + Objects.requireNonNull(ind)).set(data);
-
-
-                            HashMap<String, Integer> indexUpdate = new HashMap<>();
-                            indexUpdate.put("index", (int) (ind + 1));
-                            index.set(indexUpdate);//index++ on database
-
-                        }
-                    });
-                } else if (getShared.getBoolean("firstPlay", true) && googleSignIn) {
-                    FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-
-                    currentUser.getIdToken(true).addOnSuccessListener(new OnSuccessListener<GetTokenResult>() {
-                        @Override
-                        public void onSuccess(GetTokenResult getTokenResult) {
-                            String token = getTokenResult.getToken();
-                            editor.putString("googleToken", token);
-                            editor.putBoolean("firstPlay", false);
-                            editor.apply();
-                            rankListDataFirestore data = new rankListDataFirestore(nameOfPlayer, Integer.parseInt(String.valueOf(0)), totalPoints); //index set to zero for all
-                            leaderBoard.collection("Leaderboard").document("UID:" + token).set(data);
-
-                        }
-                    });
-                } else //if 2nd or further time then set data on the index for the play from shared pref
-                {
-                    if (googleSignIn) {
-                        String token = getShared.getString("googleToken", "");
-                        rankListDataFirestore dataUpdate = new rankListDataFirestore(nameOfPlayer, Math.toIntExact(getShared.getLong("IndexLBD", 0L)), totalPoints);
-                        leaderBoard.collection("Leaderboard").document("UID:" + token).set(dataUpdate);
-                    } else {
-                        rankListDataFirestore dataUpdate = new rankListDataFirestore(nameOfPlayer, Math.toIntExact(getShared.getLong("IndexLBD", -1L)), totalPoints);
-                        leaderBoard.collection("Leaderboard").document("Index" + getShared.getLong("IndexLBD", -1L)).set(dataUpdate);
-                    }
-                }
-                //highestScore //inside name equality if block
-                if (score[i] > getShared.getInt("highestScore", 0))
-                    editor.putInt("highestScore", score[i]);
-                //wordsPlayed
-                int wordsPlayed = rounds / name.length;
-                editor.putInt("totalWordsPlayed", (getShared.getInt("totalWordsPlayed", 0) + wordsPlayed));
-
-
-                editor.apply();
-            }
-        }
-    //version 3.0
     }
 
     public void playAgain(View v) {
@@ -194,10 +174,4 @@ public class gameOver extends AppCompatActivity {
                     }
                 }).create().show();
     }
-//    @Override
-//    public void onBackPressed() {
-//        super.onBackPressed();
-//        startActivity(new Intent(gameOver.this, GameMode.class));
-//        finish();
-//    }
 }

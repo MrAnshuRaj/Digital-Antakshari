@@ -19,6 +19,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -29,7 +30,12 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.GetTokenResult;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -58,7 +64,8 @@ public class timeAttackMode extends AppCompatActivity {
     int[] times={30,60,120,180,300};
     int[] moderation={4,3,2,0,-2};
     int correct=0,wrong=0;
-
+    int totalPoints;
+    FirebaseUser currentUser;
     @SuppressLint("SetTextI18n")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,9 +85,12 @@ public class timeAttackMode extends AppCompatActivity {
         choice=intent.getIntExtra("choiceIndex",1);
         timerProgressBar.setMax(times[choice]*100);
         time=times[choice];
-
+        currentUser =   FirebaseAuth.getInstance().getCurrentUser();
+        totalPoints= getShared.getInt("totalPoints", 0) ;
         final Handler handler = new Handler();
         handler.postDelayed(new Runnable() {
+            private String emailId = getShared.getString("email","default");
+
             @SuppressLint("SetTextI18n")
             @Override
             public void run() {
@@ -106,36 +116,31 @@ public class timeAttackMode extends AppCompatActivity {
                             }).create().show();
 
                     //updating total points and high score into shared preferences
-                    int totalPoints=getShared.getInt("totalPoints",0)+playerPoints;
-                    editor.putInt("totalPoints",totalPoints);
 
-                    //if first time set data on an index
-                    if(getShared.getBoolean("firstPlay",true)) {
-                        index.get().addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
-                            @Override
-                            public void onSuccess(DocumentSnapshot documentSnapshot) {
-                                Long ind = documentSnapshot.getLong("index");
+                     totalPoints+=playerPoints;
+                     SharedPreferences getShared = getSharedPreferences("digANT", MODE_PRIVATE);
+                     SharedPreferences.Editor editor = getShared.edit();
+                     editor.putInt("totalPoints",totalPoints);
+                     editor.apply();
 
-                                editor.putLong("IndexLBD", ind);
-                                editor.putBoolean("firstPlay", false);
-                                editor.apply(); //setting index of player from database to device
+                    if (getShared.getBoolean("firstPlay", true) ) { //if first time set data on an index
+                        final int[] pts = {0};
+                        rankListDataFirestore data = new rankListDataFirestore(nameOfPlayer, pts[0]); //index set to zero for all
+                        leaderBoard.collection("Leaderboard").document("User: "+emailId).set(data)
+                                .addOnCompleteListener(new OnCompleteListener<Void>() {
+                                    @Override
+                                    public void onComplete(@NonNull Task<Void> task) {
+                                        editor.putBoolean("firstPlay", false);
+                                        editor.putInt("totalPoints",totalPoints);
+                                        editor.apply();
+                                    }
+                                });
 
-                                rankListDataFirestore data = new rankListDataFirestore(nameOfPlayer, Integer.parseInt(String.valueOf(ind)), totalPoints);
-                                leaderBoard.collection("Leaderboard").document("Index" + Objects.requireNonNull(ind)).set(data);
-
-
-                                HashMap<String, Integer> indexUpdate = new HashMap<>();
-                                indexUpdate.put("index", (int) (ind + 1));
-                                index.set(indexUpdate);//index++ on database
-
-                            }
-                        });
+                    } else //if 2nd or further time then set data on the index for the play from shared pref
+                    {
+                        rankListDataFirestore dataUpdate = new rankListDataFirestore(nameOfPlayer, totalPoints);
+                        leaderBoard.collection("Leaderboard").document("User: "+emailId).set(dataUpdate);
                     }
-
-                    //setting total points on server
-                    rankListDataFirestore dataUpdate=new rankListDataFirestore(nameOfPlayer, Math.toIntExact(getShared.getLong("IndexLBD", -1L)),totalPoints);
-                    leaderBoard.collection("Leaderboard").document("Index" + getShared.getLong("IndexLBD",-1L)).set(dataUpdate);
-
                     //setting high score in device storage
                     if(playerPoints > getShared.getInt("High Score",0)) {
                         editor.putInt("High Score",playerPoints);

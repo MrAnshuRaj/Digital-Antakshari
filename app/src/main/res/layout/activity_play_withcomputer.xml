@@ -165,13 +165,16 @@
             android:layout_height="match_parent"
             android:background="@drawable/textfield">
 
-            <ImageView
+            <de.hdodenhof.circleimageview.CircleImageView
                 android:id="@+id/userImage"
                 android:layout_width="72dp"
                 android:layout_height="76dp"
                 android:layout_marginStart="16dp"
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="16dp"
+                android:src="@drawable/user"
+                app:civ_border_color="#FF000000"
+                app:civ_border_width="1dp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent"
