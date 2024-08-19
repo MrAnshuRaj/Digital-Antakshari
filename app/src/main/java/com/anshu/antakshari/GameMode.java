@@ -12,9 +12,13 @@ import android.graphics.BitmapFactory;
 import android.graphics.drawable.Drawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.net.Uri;
 import android.os.Bundle;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -30,11 +34,14 @@ import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
+import com.google.common.net.InternetDomainName;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
 import com.squareup.picasso.Picasso;
 
 import org.json.JSONException;
@@ -46,6 +53,7 @@ import java.io.FileNotFoundException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Random;
 
 import de.hdodenhof.circleimageview.CircleImageView;
 
@@ -79,6 +87,10 @@ public class GameMode extends AppCompatActivity {
 
         getSharedPref = getSharedPreferences("digANT", MODE_PRIVATE);
         editor = getSharedPref.edit();
+        if(getSharedPref.getString("Gender","None").equals("None"))
+        {
+            showGenderDialog();
+        }
         loadData();
 
     }
@@ -101,7 +113,6 @@ public class GameMode extends AppCompatActivity {
                     }
                 });
         isGoogleSignIn = getSharedPref.getBoolean("GoogleSignIn", false);
-
         firstName = getSharedPref.getString("Name", "player123");
         greeting.setText("Play Now, " + firstName + "!");
 
@@ -204,7 +215,30 @@ public class GameMode extends AppCompatActivity {
     public void searchWord(View v) {
         dictionary(searchBox.getText().toString().trim().toLowerCase());
     }
-
+    private void showGenderDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        LayoutInflater inflater = this.getLayoutInflater();
+        View dialogView = inflater.inflate(R.layout.dialog_gender_selection, null);
+        builder.setView(dialogView);
+        Spinner genderSpinner = dialogView.findViewById(R.id.spinner_gender);
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
+                R.array.gender_array, R.layout.spinner_item);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        genderSpinner.setAdapter(adapter);
+        builder.setPositiveButton("Done", (dialog, which) -> {
+            String selectedGender = genderSpinner.getSelectedItem().toString();
+            editor.putString("Gender", selectedGender);
+            editor.apply();
+            int avatarResource = getRandomAvatarResource(selectedGender);
+            if(!isGoogleSignIn)
+                profilePic.setImageResource(avatarResource);
+            Uri avatarUri = Uri.parse("android.resource://" + getPackageName() + "/" + avatarResource);
+            uploadImageToFirebase(avatarUri, "ownerImage");
+            Toast.makeText(GameMode.this, "Selected Gender: " + selectedGender, Toast.LENGTH_SHORT).show();
+        }).setCancelable(false);
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
     public void dictionary(String s) {
         final String[] wordMeaning = new String[1];
         RequestQueue requestQueue;
@@ -270,10 +304,53 @@ public class GameMode extends AppCompatActivity {
         return lev;
 
     }
-
+    private int getRandomAvatarResource(String gender) {
+        Random random = new Random();
+        int avatarIndex = random.nextInt(4) + 1;
+        if (gender.equals("Male")) {
+            switch (avatarIndex) {
+                case 1: return R.drawable.man1;
+                case 2: return R.drawable.man2;
+                case 3: return R.drawable.man3;
+                case 4: return R.drawable.man4;
+            }
+        } else if (gender.equals("Female")) {
+            switch (avatarIndex) {
+                case 1: return R.drawable.woman1;
+                case 2: return R.drawable.woman2;
+                case 3: return R.drawable.woman3;
+                case 4: return R.drawable.woman4;
+            }
+        }
+        return R.drawable.person;
+    }
     @Override
     protected void onResume() {
         super.onResume();
         loadData();
     }
+    private void uploadImageToFirebase(Uri imageUri, String imageType) {
+        if (imageUri != null) {
+            StorageReference storageRef= FirebaseStorage.getInstance().getReference();
+            StorageReference fileReference = storageRef.child("uploads/" + System.currentTimeMillis() + ".png");
+            fileReference.putFile(imageUri)
+                    .addOnSuccessListener(taskSnapshot -> fileReference.getDownloadUrl().addOnSuccessListener(uri -> {
+                        String imageUrl = uri.toString();
+                        saveImageUrlToFirestore(imageUrl, imageType);
+                    }))
+                    .addOnFailureListener(e -> Toast.makeText(GameMode.this, "Upload failed: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+        }
+    }
+
+    private void saveImageUrlToFirestore(String imageUrl, String imageType) {
+        String userId = auth.getUid();
+        Map<String, Object> updates = new HashMap<>();
+        updates.put(imageType, imageUrl);
+
+        db.collection("users").document(Objects.requireNonNull(userId))
+                .update(updates)
+                .addOnSuccessListener(aVoid -> Toast.makeText(this, "Image saved", Toast.LENGTH_SHORT).show())
+                .addOnFailureListener(e -> Toast.makeText(this, "Failed to save image", Toast.LENGTH_SHORT).show());
+    }
+
 }

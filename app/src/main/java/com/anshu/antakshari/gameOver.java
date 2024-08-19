@@ -106,7 +106,8 @@ public class gameOver extends AppCompatActivity {
                 editor.putInt("totalPoints", totalPoints);
                 editor.apply();
                 if (getShared.getBoolean("firstPlay", true) ) { //if first time set data on an index
-                    final int[] pts = {0};
+
+                    final int[] pts = {getShared.getInt("totalPoints",0)};
                     rankListDataFirestore data = new rankListDataFirestore(nameOfPlayer, pts[0]); //index set to zero for all
                     leaderBoard.collection("Leaderboard").document("User: "+emailId).set(data)
                         .addOnCompleteListener(new OnCompleteListener<Void>() {

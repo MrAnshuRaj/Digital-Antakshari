@@ -14,6 +14,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.drawable.AnimationDrawable;
 import android.media.MediaPlayer;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -27,7 +28,9 @@ import android.text.TextWatcher;
 import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -45,11 +48,16 @@ import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.squareup.picasso.Picasso;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -60,6 +68,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Random;
 
 
 public class game extends AppCompatActivity {
@@ -74,6 +83,11 @@ public class game extends AppCompatActivity {
     TextView nextPlayerTurn;
     String[] name;
     String[] words = new String[1000];
+    private FirebaseFirestore db;
+    private DocumentReference userRef;
+    private StorageReference storageRef;
+    FirebaseAuth auth;
+    ProgressBar gameProgressBar;
     int players;
     int countWords = 0, count = 0, REQ_CODE = 100, endgame = 0;
     long timeLeft, mainTimerLeft;
@@ -85,7 +99,7 @@ public class game extends AppCompatActivity {
     TextToSpeech t2;
     MediaPlayer sec3;
     String ne;
-    ObjectAnimator animator;
+    String[] profileURLs;
     Map<String, String> wordServer, timerHashStart, timerHashStop, stopGameInit, stopGame, timerInit;
     Boolean pauseTimer = false, isOnline = false;
     SharedPreferences getShared;
@@ -94,7 +108,6 @@ public class game extends AppCompatActivity {
     RecyclerGameAdapter adapter;
     ArrayList<gameplayModel> arrayList = new ArrayList<>();
     private CountDownTimer timer, mainTimer;
-
     @SuppressLint("SetTextI18n")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -103,7 +116,7 @@ public class game extends AppCompatActivity {
         n01 = findViewById(R.id.n01);
         time = findViewById(R.id.time);
         nextPlayerTurn = findViewById(R.id.playerTurn);
-
+        gameProgressBar = findViewById(R.id.progressBarGame);
         recyclerView = findViewById(R.id.gameRecyclerView);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
 
@@ -122,7 +135,10 @@ public class game extends AppCompatActivity {
         timerHashStart.put("Status", "Start");
         timerHashStop.put("Status", "Stop");
         timerInit.put("Status", "None");
-
+        auth = FirebaseAuth.getInstance();
+        db = FirebaseFirestore.getInstance();
+        storageRef = FirebaseStorage.getInstance().getReference();
+        userRef = db.collection("users").document(auth.getCurrentUser().getUid());
         startMainTimer(main_time_in_milli_sec);
 
         time2 = findViewById(R.id.time2);
@@ -130,19 +146,41 @@ public class game extends AppCompatActivity {
         prv = findViewById(R.id.prev);
         input = findViewById(R.id.INPUT);
 
+
+
         Intent intent = getIntent();
 
         this.name = intent.getStringArrayExtra("nameArray");
         this.isOnline = intent.getBooleanExtra("isOnline", false);
+        if(isOnline)
+            this.profileURLs = intent.getStringArrayExtra("urlList");
         this.nextLet = intent.getCharExtra("nextL", 'k');
         score = new int[name.length];
         players = name.length;
+        if(!isOnline)
+         profileURLs=new String[name.length];
+        final String[] currentUrl = new String[1];
+        boolean isGoogleSignIn=getShared.getBoolean("GoogleSignIn",false);
+        if (isGoogleSignIn) {
+            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+            if (user != null && user.getPhotoUrl() != null) {
+                currentUrl[0] = String.valueOf(user.getPhotoUrl());
+                initialize(currentUrl[0]);
+            }
+        } else {
+            userRef.get().addOnCompleteListener(task -> {
+                if (task.isSuccessful()) {
+                    DocumentSnapshot document = task.getResult();
+                    if (document.exists() && document.getString("ownerImage") != null) {
+                        currentUrl[0] = document.getString("ownerImage");
 
-        for (int i = 0; i < name.length; i++) {
-            arrayList.add(new gameplayModel(name[i], score[i], ""));
+                        initialize(currentUrl[0]);
+
+                    }
+                }
+            });
         }
-        adapter = new RecyclerGameAdapter(game.this, arrayList);
-        recyclerView.setAdapter(adapter);
+
 
         nextPlayerTurn.setText(name[0] + " 's turn");
         blink(nextPlayerTurn);
@@ -226,11 +264,74 @@ public class game extends AppCompatActivity {
             });
         }
 
+
+
+
+
+
+    }
+    public void initialize(String currentUrl)
+    {
+        for (int i = 0; i < name.length; i++) {
+            if(isOnline) {
+                arrayList.add(new gameplayModel(name[i], score[i], "",profileURLs[i]));
+            }
+            else { //for getting random avatars when in offline mode
+                if(name[i].equals(nameCurr))
+                {
+                    arrayList.add(new gameplayModel(name[i], score[i], "",currentUrl));
+                    profileURLs[i]=currentUrl;
+                }
+                else {
+                    int resource = getRandomAvatarResource();
+                    arrayList.add(new gameplayModel(name[i], score[i], "", String.valueOf(resource)));
+                    profileURLs[i]=String.valueOf(resource);
+                }
+            }
+        }
         HashMap<String, String> typingYes = new HashMap<>();
         typingYes.put("status", "Typing..");
         HashMap<String, String> typingNo = new HashMap<>();
         typingNo.put("status", "");
 
+        adapter = new RecyclerGameAdapter(game.this, arrayList);
+        recyclerView.setLayoutManager(new LinearLayoutManager(game.this,LinearLayoutManager.HORIZONTAL,false));
+        recyclerView.setAdapter(adapter);
+        adapter.setSelectedPosition(0);
+        gameProgressBar.setVisibility(View.GONE);
+
+        if (isOnline) {
+            OnlineTimer.addSnapshotListener((value, error) -> {
+                assert value != null;
+                if (value.exists()) {
+                    String status = value.getString("Status");
+                    assert status != null;
+                    if (status.equalsIgnoreCase("Start"))
+                        startTimer(timeLeft);
+                    else if (status.equalsIgnoreCase("Stop"))
+                        timer.cancel();
+                }
+            });
+            isTyping.set(typingNo).addOnSuccessListener(new OnSuccessListener<Void>() {
+                @Override
+                public void onSuccess(Void unused) {
+                    isTyping.addSnapshotListener(new EventListener<DocumentSnapshot>() {
+                        @Override
+                        public void onEvent(@Nullable DocumentSnapshot documentSnapshot, @Nullable FirebaseFirestoreException e) {
+                            String status = "";
+                            if (documentSnapshot != null) {
+                                status = documentSnapshot.getString("status");
+                            }
+                            arrayList.set(count, new gameplayModel(name[count], score[count], status, profileURLs[count]));
+                            adapter.notifyItemChanged(count);
+                        }
+                    });
+                }
+            });
+            //first creating the document then setting snapshot listener
+
+
+        }
         input.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
@@ -274,41 +375,8 @@ public class game extends AppCompatActivity {
                 }
             }
         });
-        if (isOnline) {
-            OnlineTimer.addSnapshotListener((value, error) -> {
-                assert value != null;
-                if (value.exists()) {
-                    String status = value.getString("Status");
-                    assert status != null;
-                    if (status.equalsIgnoreCase("Start"))
-                        startTimer(timeLeft);
-                    else if (status.equalsIgnoreCase("Stop"))
-                        timer.cancel();
-                }
-            });
-
-            //first creating the document then setting snapshot listener
-            isTyping.set(typingNo).addOnSuccessListener(new OnSuccessListener<Void>() {
-                @Override
-                public void onSuccess(Void unused) {
-                    isTyping.addSnapshotListener(new EventListener<DocumentSnapshot>() {
-                        @Override
-                        public void onEvent(@Nullable DocumentSnapshot documentSnapshot, @Nullable FirebaseFirestoreException e) {
-                            String status = "";
-                            if (documentSnapshot != null) {
-                                status = documentSnapshot.getString("status");
-                            }
-                            arrayList.set(count, new gameplayModel(name[count], score[count], status));
-                            adapter.notifyItemChanged(count);
-                        }
-                    });
-                }
-            });
-
-        }
 
     }
-
     public boolean repetition() {
         String s = input.getText().toString();
         for (String word : words) {
@@ -323,80 +391,59 @@ public class game extends AppCompatActivity {
     public int scores(String w) {
         int pt;
         sec3.stop();
+
+        // Set the time limit based on mode
+        long timeLimit = isOnline ? 30000 : timeWord;  // 30 seconds for online, variable for offline
+
+        // Base score calculation based on word length
         if (w.equals("0")) {
             pt = -5;
             n01.setText("-5 points");
-            Animation a1 = AnimationUtils.loadAnimation(this, R.anim.pointsanim);
-            n01.startAnimation(a1);
             t2.speak("Idiot", TextToSpeech.QUEUE_ADD, null);
-            new CountDownTimer(2000, 1000) {
-                @Override
-                public void onTick(long l) {
-                }
-
-                @Override
-                public void onFinish() {
-                    n01.setText("");
-                }
-            }.start();
-
         } else if (w.length() <= 3) {
             pt = 3;
             t2.speak("Good", TextToSpeech.QUEUE_FLUSH, null);
             n01.setText("+3 points");
-            //timer for displaying points
-            new CountDownTimer(2000, 1000) {
-                @Override
-                public void onTick(long l) {
-                }
-
-                @Override
-                public void onFinish() {
-                    n01.setText("");
-                }
-            }.start();
-            Animation a1 = AnimationUtils.loadAnimation(this, R.anim.pointsanim);
-            n01.startAnimation(a1);
-
+        } else if (w.length() <= 6) {
+            pt = 5;
+            t2.speak("Very Good", TextToSpeech.QUEUE_FLUSH, null);
+            n01.setText("+5 points");
         } else {
-            if (w.length() <= 6) {
-                t2.speak("Very Good", TextToSpeech.QUEUE_FLUSH, null);
-                pt = 5;
-                n01.setText("+5 points");
-                //timer for displaying points
-                new CountDownTimer(2000, 1000) {
-                    @Override
-                    public void onTick(long l) {
-                    }
-
-                    @Override
-                    public void onFinish() {
-                        n01.setText("");
-                    }
-                }.start();
-                Animation a1 = AnimationUtils.loadAnimation(this, R.anim.pointsanim);
-                n01.startAnimation(a1);
-
-            } else {
-                pt = w.length();
-                t2.speak("Excellent", TextToSpeech.QUEUE_FLUSH, null);
-
-                n01.setText("+" + pt + " points");
-                //timer for displaying points
-                new CountDownTimer(2000, 1000) {
-                    @Override
-                    public void onTick(long l) {
-                    }
-
-                    @Override
-                    public void onFinish() {
-                        n01.setText("");
-                    }
-                }.start();
-                Animation a1 = AnimationUtils.loadAnimation(this, R.anim.pointsanim);
-                n01.startAnimation(a1);
-            }
+            pt = w.length();
+            t2.speak("Excellent", TextToSpeech.QUEUE_FLUSH, null);
+            n01.setText("+" + pt + " points");
         }
+
+        // Bonus for fast response based on remaining time
+        if (timeLeft > (timeLimit * 0.8)) {  // 80% or more time remaining
+            pt += 3;  // High bonus for very fast response
+            t2.speak("Blazing Fast!", TextToSpeech.QUEUE_ADD, null);
+            n01.append(" +3 bonus!");
+        } else if (timeLeft > (timeLimit * 0.5)) {  // 50% or more time remaining
+            pt += 2;  // Medium bonus
+            t2.speak("Quick Response!", TextToSpeech.QUEUE_ADD, null);
+            n01.append(" +2 bonus!");
+        } else if (timeLeft > (timeLimit * 0.2)) {  // 20% or more time remaining
+            pt += 1;  // Small bonus
+            t2.speak("Nice Timing!", TextToSpeech.QUEUE_ADD, null);
+            n01.append(" +1 bonus!");
+        }
+
+        // Animation and cleanup
+        Animation a1 = AnimationUtils.loadAnimation(this, R.anim.pointsanim);
+        n01.startAnimation(a1);
+
+        // Timer for displaying points
+        new CountDownTimer(2000, 1000) {
+            @Override
+            public void onTick(long l) {}
+
+            @Override
+            public void onFinish() {
+                n01.setText("");
+            }
+        }.start();
+
         return pt;
     }
 
@@ -408,7 +455,6 @@ public class game extends AppCompatActivity {
         if (!str.equals("0")) {
             Toast.makeText(game.this, "Submitting word...", Toast.LENGTH_SHORT).show();
             JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.GET,
-
 
                     "https://api.api-ninjas.com/v1/dictionary?word=" + str, null, new Response.Listener<JSONObject>() {
 
@@ -425,7 +471,7 @@ public class game extends AppCompatActivity {
                         }
 
                     } catch (JSONException e) {
-                        e.printStackTrace();
+                        e.printStackTrace(System.out);
                     }
 
                 }
@@ -458,6 +504,8 @@ public class game extends AppCompatActivity {
     public void next(View V) {
         MediaPlayer media = MediaPlayer.create(game.this, R.raw.click);
         media.start();
+        InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+        imm.hideSoftInputFromWindow(input.getWindowToken(), 0);
         if (isOnline) {
             if (name[count].equalsIgnoreCase(nameCurr)) {
                 online();
@@ -506,11 +554,12 @@ public class game extends AppCompatActivity {
                 } else //word starts from correct letter
                 {
                     score[count] += scores(ne);
-                    arrayList.set(count, new gameplayModel(name[count], score[count], ""));
+                    arrayList.set(count, new gameplayModel(name[count], score[count], "", profileURLs[count]));
                     adapter.notifyItemChanged(count);
 
                     if (count != (players - 1)) { // if not last player
                         recyclerView.scrollToPosition(count + 1);
+                        adapter.setSelectedPosition(count+1);
                         nextPlayerTurn.setText(name[count + 1] + " 's turn");
                     }
 
@@ -524,8 +573,9 @@ public class game extends AppCompatActivity {
                         }
                     }
 
-                    if (count == (players - 1)) {
+                    if (count == (players - 1)) { //if last player
                         count = -1;
+                        adapter.setSelectedPosition(0);
                         recyclerView.scrollToPosition(0);
                         nextPlayerTurn.setText(name[0] + " 's turn");
                     }
@@ -568,10 +618,11 @@ public class game extends AppCompatActivity {
     public void next1() {
         String inputWord = input.getText().toString();
         isValidWord(inputWord);
-
     }
 
     public void startTimer(long timeTimer) {//method to start timer for word
+        if(timer!=null)
+            timer.cancel();
         timer = new CountDownTimer(timeTimer, 1000) {
 
             @SuppressLint("SetTextI18n")
@@ -597,7 +648,6 @@ public class game extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        super.onBackPressed();
         sec3.stop();
         new AlertDialog.Builder(this).setTitle("Are you sure you want to exit?")
                 .setMessage("Current game data will be lost in doing so")
@@ -732,10 +782,11 @@ public class game extends AppCompatActivity {
             gameOver.putExtra("scoreArray", this.score);
             gameOver.putExtra("wordsList", words);
             gameOver.putExtra("Rounds", rounds);
+            finish();
             startActivity(gameOver);
             Arrays.fill(score, 0);
             Arrays.fill(words, "");
-            finish();
+
         }
     }
 
@@ -783,11 +834,6 @@ public class game extends AppCompatActivity {
         requestQueue.add(jsonObjectRequest);
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-    }
-
     public void dictionaryBtnClick(View v) {
         Toast.makeText(game.this, "Loading...", Toast.LENGTH_LONG).show();
         dictionary(ne);
@@ -810,18 +856,46 @@ public class game extends AppCompatActivity {
     }
 
     public void blink(TextView txt) {
-        //animator=ObjectAnimator.ofInt(txt,"backgroundResource",R.drawable.turn,R.drawable.main_rules,R.drawable.mainback);
-        animator = ObjectAnimator.ofInt(txt, "backgroundColor", Color.CYAN, Color.YELLOW, Color.RED);
-        animator.setDuration(2000);
-        animator.setEvaluator(new ArgbEvaluator());
-        animator.setRepeatCount(Animation.REVERSE);
-        animator.setRepeatCount(Animation.INFINITE);
-        animator.start();
+        AnimationDrawable animationDrawable = (AnimationDrawable) txt.getContext().getDrawable(R.drawable.animation_drawable);
+
+        txt.setBackground(animationDrawable);
+        txt.post(new Runnable() {
+            @Override
+            public void run() {
+                animationDrawable.start();
+            }
+        });
+        txt.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                animationDrawable.stop();
+                animationDrawable.start();
+            }
+        }, animationDrawable.getNumberOfFrames() * 500);
     }
 
     public boolean isNetworkConnected() {
         ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo netInfo = cm.getActiveNetworkInfo();
         return netInfo != null && netInfo.isConnectedOrConnecting();
+    }
+    private int getRandomAvatarResource() {
+        Random random = new Random();
+        int avatarIndex = random.nextInt(5) + 1;
+         switch (avatarIndex) {
+             case 1:
+                 return R.drawable.person;
+             case 2:
+                 return R.drawable.person2;
+             case 3:
+                 return R.drawable.person3;
+             case 4:
+                 return R.drawable.person4;
+             case 5:
+                 return R.drawable.person5;
+             default:
+                 return R.drawable.person;
+         }
+
     }
 }

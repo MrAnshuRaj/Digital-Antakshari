@@ -173,4 +173,10 @@ public class SignUpActivity extends AppCompatActivity {
         }
         editText.setSelection(editText.getText().length());
     }
+    @Override
+    public void onBackPressed() {
+        startActivity(new Intent(SignUpActivity.this, MainActivity2.class));
+        finish();
+    }
+
 }
