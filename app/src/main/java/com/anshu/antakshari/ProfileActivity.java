@@ -58,6 +58,7 @@ public class ProfileActivity extends AppCompatActivity {
     FirebaseAuth auth;
     private StorageReference storageRef;
 
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -78,13 +79,16 @@ public class ProfileActivity extends AppCompatActivity {
         timeSpentPlaying=findViewById(R.id.timeSpentPlaying);
         signOut =findViewById(R.id.signOutBtn);
         profilePicUpdateBtn=findViewById(R.id.imageButton);
+        isGoogleSignIn=getSharedPref.getBoolean("GoogleSignIn",false);
+        if(isGoogleSignIn)
+                profilePicUpdateBtn.setVisibility(View.INVISIBLE);
         profilePicUpdateBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                openFileChooser(PICK_OWNER_IMAGE_REQUEST);
+                    openFileChooser(PICK_OWNER_IMAGE_REQUEST);
             }
         });
-        isGoogleSignIn=getSharedPref.getBoolean("GoogleSignIn",false);
+
         profilePicPath = getSharedPref.getString("ProfilePath","");
         auth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
@@ -284,6 +288,8 @@ public class ProfileActivity extends AppCompatActivity {
 
     public void updateName(View v)
     {
+        int width = (int)(getResources().getDisplayMetrics().widthPixels*0.90);
+        int height = (int)(getResources().getDisplayMetrics().heightPixels*0.30);
         Dialog dialog= new Dialog(this);
         dialog.setContentView(R.layout.dialog_update_name);
         Button submitButton=dialog.findViewById(R.id.submitName);
@@ -299,6 +305,7 @@ public class ProfileActivity extends AppCompatActivity {
                 editor.putString("Name", nameUpdated);
                 editor.putString("FullName", nameInput.getText().toString());
                 editor.apply();
+                db.collection("users").document(auth.getCurrentUser().getUid()).update("name",nameInput.getText().toString());
                 name.setText(nameInput.getText().toString());
             }
             catch(Exception e)
@@ -307,5 +314,7 @@ public class ProfileActivity extends AppCompatActivity {
             }
         });
         dialog.show();
+
+        dialog.getWindow().setLayout(width, height);
     }
 }

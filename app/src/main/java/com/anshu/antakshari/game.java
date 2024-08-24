@@ -25,10 +25,13 @@ import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
+import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -81,6 +84,7 @@ public class game extends AppCompatActivity {
     TextView n01;
     TextView time2;
     TextView nextPlayerTurn;
+    WordChecker wordChecker;
     String[] name;
     String[] words = new String[1000];
     private FirebaseFirestore db;
@@ -95,6 +99,7 @@ public class game extends AppCompatActivity {
     int rounds = 0;
     String onlineWord, nameCurr;
     EditText input;
+    Button nextBtn;
     int[] score;
     TextToSpeech t2;
     MediaPlayer sec3;
@@ -122,7 +127,7 @@ public class game extends AppCompatActivity {
 
         getShared = getSharedPreferences("digANT", MODE_PRIVATE);
         editor = getShared.edit();
-
+        wordChecker = new WordChecker(this);
         nameCurr = getShared.getString("Name", "Null");
         wordServer = new HashMap<>();
         stopGame = new HashMap<>();
@@ -140,7 +145,7 @@ public class game extends AppCompatActivity {
         storageRef = FirebaseStorage.getInstance().getReference();
         userRef = db.collection("users").document(auth.getCurrentUser().getUid());
         startMainTimer(main_time_in_milli_sec);
-
+        nextBtn = findViewById(R.id.nextBtn);
         time2 = findViewById(R.id.time2);
         nextLetter = findViewById(R.id.nextletters);
         prv = findViewById(R.id.prev);
@@ -189,10 +194,25 @@ public class game extends AppCompatActivity {
         sec3 = MediaPlayer.create(game.this, R.raw.countdown);
 
         t2 = new TextToSpeech(this, i -> {
-            if (i != TextToSpeech.ERROR)
+            if (i != TextToSpeech.ERROR) {
                 t2.setLanguage(Locale.ENGLISH);
+            }
         });
-
+        nextBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                next();
+            }
+        });
+        input.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE ||
+                    (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER && event.getAction() == KeyEvent.ACTION_DOWN)) {
+                // Trigger your function here
+                next();
+                return true;
+            }
+            return false;
+        });
         timer = new CountDownTimer(timeWord, 1000) {
             @Override
             public void onTick(long l) {
@@ -226,9 +246,7 @@ public class game extends AppCompatActivity {
                         pauseTimer = true;
                         input.setText(onlineWord);
                         next1();
-
                     }
-
 
                 }
             }));
@@ -263,12 +281,6 @@ public class game extends AppCompatActivity {
                 }
             });
         }
-
-
-
-
-
-
     }
     public void initialize(String currentUrl)
     {
@@ -488,20 +500,20 @@ public class game extends AppCompatActivity {
                 @Override
                 public Map<String, String> getHeaders() throws AuthFailureError {
                     HashMap headers = new HashMap();
-                    headers.put("X-Api-Key", "OPakK7lmBBhCx+Lakh1IGQ==14OypK9nRf0bFDPG");
+                    headers.put("X-Api-Key", APIKeys.getAPI_NINJAS());
                     return headers;
                 }
             };
 
 
             requestQueue.add(jsonObjectRequest);
-        } else
+        } else {
+            //input.setText("0");
             next2();
-
-
+        }
     }
 
-    public void next(View V) {
+    public void next() {
         MediaPlayer media = MediaPlayer.create(game.this, R.raw.click);
         media.start();
         InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -614,10 +626,23 @@ public class game extends AppCompatActivity {
             }
         }
     }
+    public void isValidWord1(String wordToCheck)
+    {
+        if(wordToCheck.equals("0"))
+            next2();
+        boolean isValid = wordChecker.isValidWord(wordToCheck);
+        if (isValid) {
+            next2();
+           // Toast.makeText(game.this, "Word is valid", Toast.LENGTH_SHORT).show();
+        } else {
+            t2.speak("Invalid English Word!", TextToSpeech.QUEUE_FLUSH, null);
+            Toast.makeText(game.this, "Word is invalid", Toast.LENGTH_SHORT).show();
+        }
 
+    }
     public void next1() {
         String inputWord = input.getText().toString();
-        isValidWord(inputWord);
+        isValidWord1(inputWord);
     }
 
     public void startTimer(long timeTimer) {//method to start timer for word
@@ -827,7 +852,7 @@ public class game extends AppCompatActivity {
             @Override
             public Map<String, String> getHeaders() throws AuthFailureError {
                 HashMap headers = new HashMap();
-                headers.put("X-Api-Key", "OPakK7lmBBhCx+Lakh1IGQ==14OypK9nRf0bFDPG");
+                headers.put("X-Api-Key", APIKeys.getAPI_NINJAS());
                 return headers;
             }
         };

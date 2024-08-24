@@ -50,7 +50,8 @@ public class FactsFragment extends Fragment {
         scrollView = root.findViewById(R.id.factsScrollView);
         pb = root.findViewById(R.id.loadFactsProgressBar);
         facts = new StringBuilder();
-        loadFacts();
+        for(int i=1;i<=10;i++)
+            loadFacts();
         scrollView.getViewTreeObserver().addOnScrollChangedListener(new ViewTreeObserver.OnScrollChangedListener() {
             @Override
             public void onScrollChanged() {
@@ -59,7 +60,8 @@ public class FactsFragment extends Fragment {
                 if (bottomDetector == 0) {
                     //Toast.makeText(getActivity(),"Loading more...",Toast.LENGTH_SHORT).show();
                     pb.setVisibility(View.VISIBLE);
-                    loadFacts();
+                    for(int i=1;i<=10;i++)
+                        loadFacts();
                 }
             }
         });
@@ -69,9 +71,9 @@ public class FactsFragment extends Fragment {
     }
 
     public void loadFacts() {
-        RequestQueue requestQueue = Volley.newRequestQueue(Objects.requireNonNull(getActivity()));
+        RequestQueue requestQueue = Volley.newRequestQueue(requireActivity());
         JsonArrayRequest jsonObjectRequest = new JsonArrayRequest(Request.Method.GET,
-                "https://api.api-ninjas.com/v1/facts?limit=30", null, new Response.Listener<JSONArray>() {
+                "https://api.api-ninjas.com/v1/facts", null, new Response.Listener<JSONArray>() {
 
             @Override
             public void onResponse(JSONArray response) {
@@ -82,7 +84,7 @@ public class FactsFragment extends Fragment {
                         if (factsCount == 1) {
                             facts.append(factsCount).append(". ").append(obj.getString("fact"));
                         } else {
-                            facts.append("\n\n").append(factsCount).append(". ").append(obj.getString("fact"));
+                            facts.append("\n\n\n\n").append(factsCount).append(". ").append(obj.getString("fact"));
                         }
                         pb.setVisibility(View.GONE);
                         factsTextView.setText(facts);
@@ -104,7 +106,7 @@ public class FactsFragment extends Fragment {
             @Override
             public Map<String, String> getHeaders() throws AuthFailureError {
                 HashMap headers = new HashMap();
-                headers.put("X-Api-Key", "OPakK7lmBBhCx+Lakh1IGQ==14OypK9nRf0bFDPG");
+                headers.put("X-Api-Key", APIKeys.getAPI_NINJAS());
                 return headers;
             }
         };

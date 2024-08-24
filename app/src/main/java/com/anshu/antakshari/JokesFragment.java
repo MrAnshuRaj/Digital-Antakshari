@@ -49,16 +49,17 @@ public class JokesFragment extends Fragment {
         scrollView = root.findViewById(R.id.jokes_ScrollView);
         pb = root.findViewById(R.id.loadJokesProgressBar);
         jokes = new StringBuilder();
-        loadJokes();
+        for(int i=1;i<=10;i++)
+            loadJokes();
         scrollView.getViewTreeObserver().addOnScrollChangedListener(new ViewTreeObserver.OnScrollChangedListener() {
             @Override
             public void onScrollChanged() {
                 View view = scrollView.getChildAt(scrollView.getChildCount() - 1);
                 int bottomDetector = view.getBottom() - (scrollView.getHeight() + scrollView.getScrollY());
                 if (bottomDetector == 0) {
-                    // Toast.makeText(getActivity(),"Loading more...",Toast.LENGTH_SHORT).show();
                     pb.setVisibility(View.VISIBLE);
-                    loadJokes();
+                    for(int i=1;i<=10;i++)
+                        loadJokes();
                 }
             }
         });
@@ -68,7 +69,7 @@ public class JokesFragment extends Fragment {
     public void loadJokes() {
         RequestQueue requestQueue = Volley.newRequestQueue(requireActivity());
         JsonArrayRequest jsonObjectRequest = new JsonArrayRequest(Request.Method.GET,
-                "https://api.api-ninjas.com/v1/jokes?limit=30", null, new Response.Listener<JSONArray>() {
+                "https://api.api-ninjas.com/v1/jokes", null, new Response.Listener<JSONArray>() {
 
             @Override
             public void onResponse(JSONArray response) {
@@ -79,7 +80,7 @@ public class JokesFragment extends Fragment {
                         if (jokesCount == 1) {
                             jokes.append(jokesCount).append(". ").append(obj.getString("joke"));
                         } else {
-                            jokes.append("\n\n").append(jokesCount).append(". ").append(obj.getString("joke"));
+                            jokes.append("\n\n\n\n").append(jokesCount).append(". ").append(obj.getString("joke"));
                         }
                         jokesTextView.setText(jokes);
                         pb.setVisibility(View.GONE);
@@ -100,7 +101,7 @@ public class JokesFragment extends Fragment {
             @Override
             public Map<String, String> getHeaders() throws AuthFailureError {
                 HashMap headers = new HashMap();
-                headers.put("X-Api-Key", "OPakK7lmBBhCx+Lakh1IGQ==14OypK9nRf0bFDPG");
+                headers.put("X-Api-Key", APIKeys.getAPI_NINJAS());
                 return headers;
             }
         };

@@ -82,7 +82,9 @@ public class gameOver extends AppCompatActivity {
         Animation a1 = AnimationUtils.loadAnimation(this, R.anim.anim2);
         cong.startAnimation(a1);
         currentUser=FirebaseAuth.getInstance().getCurrentUser();
-        emailId=currentUser.getEmail();
+        if (currentUser != null) {
+            emailId=currentUser.getEmail();
+        }
         sort();
         storeData();
     }

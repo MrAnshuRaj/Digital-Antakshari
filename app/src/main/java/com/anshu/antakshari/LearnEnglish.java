@@ -111,7 +111,7 @@ public class LearnEnglish extends AppCompatActivity {
             @Override
             public Map<String, String> getHeaders() throws AuthFailureError {
                 HashMap headers = new HashMap();
-                headers.put("X-Api-Key", "OPakK7lmBBhCx+Lakh1IGQ==14OypK9nRf0bFDPG");
+                headers.put("X-Api-Key", APIKeys.getAPI_NINJAS());
                 return headers;
             }
         };

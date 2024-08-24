@@ -61,6 +61,7 @@ import java.util.Objects;
 public class playWithComputer extends AppCompatActivity {
     ImageView userPic, done;
     String previousWord;
+    TextToSpeech t2;
     char lastLetterOfPreviousWord;
     boolean firstTurn=true,wrongWord=false, vocabExhaust=false;
     int points=0,computerPoints=0,wordCounter=0,REQ_CODE=100;
@@ -110,6 +111,13 @@ public class playWithComputer extends AppCompatActivity {
         userPic=findViewById(R.id.userImage);
         done=findViewById(R.id.doneImageVIew);
         submitProgressBar=findViewById(R.id.submitProgressBar);
+
+        t2 = new TextToSpeech(this, i -> {
+            if (i != TextToSpeech.ERROR) {
+                t2.setLanguage(Locale.ENGLISH);
+            }
+        });
+
         currentUser =   FirebaseAuth.getInstance().getCurrentUser();
         endButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -186,8 +194,36 @@ public class playWithComputer extends AppCompatActivity {
         }
 
     }
+    public void isValidWord(String wordToCheck)
+    {
+        WordChecker wordChecker = new WordChecker(this);
+        boolean isValid = wordChecker.isValidWord(wordToCheck);
+        submitProgressBar.setVisibility(View.GONE);
+        if (isValid) {
+            done.setImageResource(R.drawable.done);
+            done.setVisibility(View.VISIBLE);
+            nextButton();
+        } else {
+            done.setImageResource(R.drawable.cross);
+            done.setVisibility(View.VISIBLE);
+            nextBtn.setEnabled(true);
+            tts.speak("Invalid English word! Try again.",TextToSpeech.QUEUE_FLUSH,null);
+            Toast.makeText(playWithComputer.this,"Invalid English word! Try again. ",Toast.LENGTH_SHORT).show();
+        }
+        new CountDownTimer(1500, 500) {
+            @Override
+            public void onTick(long l) {
 
-    public void isValidWord(String str) {
+            }
+
+            @Override
+            public void onFinish() {
+                done.setVisibility(View.GONE);
+            }
+        }.start();
+
+    }
+    public void isValidWord0(String str) {
         RequestQueue requestQueue;
         requestQueue = Volley.newRequestQueue(this);
         str = str.trim();
@@ -238,7 +274,7 @@ public class playWithComputer extends AppCompatActivity {
             @Override
             public Map<String, String> getHeaders() throws AuthFailureError {
                 HashMap headers=new HashMap();
-                headers.put("X-Api-Key","OPakK7lmBBhCx+Lakh1IGQ==14OypK9nRf0bFDPG");
+                headers.put("X-Api-Key",APIKeys.getAPI_NINJAS());
                 return headers;
             }
         };

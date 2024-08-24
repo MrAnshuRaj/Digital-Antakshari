@@ -81,7 +81,7 @@ public class QuotesFragment extends Fragment {
                         if(quotesCount==1) {
                             quotes.append(quotesCount).append(". ").append(obj.getString("quote")).append("\n(").append(obj.getString("category")).append(")\n--By ").append(obj.getString("author"));
                         } else {
-                            quotes.append("\n\n").append(quotesCount).append(". ").append(obj.getString("quote")).append("\n(").append(obj.getString("category")).append(")\n--By ").append(obj.getString("author"));
+                            quotes.append("\n\n\n").append(quotesCount).append(". ").append(obj.getString("quote")).append("\n(").append(obj.getString("category")).append(")\n--By ").append(obj.getString("author"));
                         }
                         quotesTextView.setText(quotes);
                         pb.setVisibility(View.GONE);
@@ -100,8 +100,8 @@ public class QuotesFragment extends Fragment {
         }) {
             @Override
             public Map<String, String> getHeaders() throws AuthFailureError {
-                HashMap headers=new HashMap();
-                headers.put("X-Api-Key","OPakK7lmBBhCx+Lakh1IGQ==14OypK9nRf0bFDPG");
+                HashMap<String,String> headers=new HashMap<>();
+                headers.put("X-Api-Key",APIKeys.getAPI_NINJAS());
                 return headers;
             }
         };
